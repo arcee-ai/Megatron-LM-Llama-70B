@@ -744,6 +744,10 @@ def _add_network_size_args(parser):
                           help='Use interleaved rotary embedding.')
     group.add_argument('--rotary-seq-len-interpolation-factor', type=int, default=None,
                        help='Sequence length interpolation factor for rotary embeddings.')
+    # This argument is already there and used in the the GPTModel https://github.com/NVIDIA/Megatron-LM/blob/c3677e09aa4e2eec37048307bd795928b8f8324a/megatron/core/models/gpt/gpt_model.py#L54
+    # But it doesn't get passed and default to 10000
+    # In models like Llama3 the value is 500000
+    group.add_argument('--rotary-base, type=int, default=10000')
     group.add_argument('--no-position-embedding',
                        action='store_false',
                        help='Disable position embedding. Deprecated: use --position-embedding-type',
@@ -1461,10 +1465,15 @@ def _add_data_args(parser):
                                 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer',
                                 'Llama2Tokenizer',
-                                'NullTokenizer'],
+                                'NullTokenizer',
+                                'Llama3Tokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='Sentencepiece tokenizer model.')
+    group.add_argument('--extra-hf-tokens', type=int, default=None,
+                    help='Some HF tokenizers do not include the extra tokens in tokenizer.vocab_size Eg: llama3.')  
+    group.add_argument('--hf-tokenizer-path', type=str, default=None,
+                help='Load non sentencepiece tokenizers from Huggingface Eg: llama3.')  
     group.add_argument('--reset-position-ids', action='store_true',
                        help='Reset posistion ids after end-of-document token.')
     group.add_argument('--reset-attention-mask', action='store_true',
