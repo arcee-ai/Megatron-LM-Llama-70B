@@ -142,6 +142,7 @@ class Partition(object):
 
 
     def process_json_file(self, file_name):
+        
         input_file_name, output_prefix = file_name
         print("Opening", input_file_name)
         fin = open(input_file_name, 'r', encoding='utf-8')
@@ -173,15 +174,25 @@ class Partition(object):
         startup_end = time.time()
         proc_start = time.time()
         total_bytes_processed = 0
+        total_tokens_processed = 0
         print("Time to startup:", startup_end - startup_start)
         for i, (doc, sentence_lens, bytes_processed) in enumerate(encoded_docs, start=1):
             total_bytes_processed += bytes_processed
             for key in doc.keys():
                 builders[key].add_document(doc[key], sentence_lens[key])
+                total_tokens_processed += sum(sentence_lens[key])
             self.print_processing_stats(i, proc_start, total_bytes_processed)
 
         fin.close()
         builders[key].finalize(output_idx_files[key])
+        print(f"Total tokens processed: {total_tokens_processed}")
+
+        # Form the full file path
+        full_file_path = os.path.join(os.path.dirname(output_prefix), 'total_tokens.txt')
+
+        # Write total tokens processed to a text file at the specified path
+        with open(full_file_path, 'w') as file:
+            file.write(f"Total tokens processed: {total_tokens_processed}\n")
 
 
 def get_args():
@@ -201,7 +212,7 @@ def get_args():
                        choices=['BertWordPieceLowerCase','BertWordPieceCase',
                                 'GPT2BPETokenizer', 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer', 'Llama2Tokenizer',
-                                'NullTokenizer'],
+                                'Llama3Tokenizer','NullTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='YTTM tokenizer model.')
@@ -231,6 +242,10 @@ def get_args():
     group.add_argument('--keep-sequential-samples', action='store_true',
                        help='Ensure ordering of samples in .jsonl files is '
                             'preserved when using partitions>1.')
+    group.add_argument('--hf-tokenizer-path', type=str, required=True,
+                       help='Path to the HF tokenizer')
+    group.add_argument('--extra-hf-tokens', type=int, required=True,
+                       help='How many extra tokens the model has that is not provided by the tokenizer.vocab_size')
     args = parser.parse_args()
     args.keep_empty = False
 
@@ -274,7 +289,6 @@ def main():
         else:
             raise Exception(
                 "nltk library required for sentence splitting is not available.")
-
     in_ss_out_names = []
     if args.partitions == 1:
         file_name, extension = os.path.splitext(args.input)

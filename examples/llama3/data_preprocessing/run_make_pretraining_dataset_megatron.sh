@@ -10,19 +10,8 @@ load_dir=$5
 
 INPUT="${input_data_dir}"
 
-if [ $tokenizer = "qwen2bpe" ]; then
-  python preprocess_data_megatron.py \
-  --input ${INPUT} \
-  --output-prefix ${output_data_dir}/skypile_qwen2bpe \
-  --patch-tokenizer-type Qwen2Tokenizer \
-  --tokenizer-type GPT2BPETokenizer \
-  --load ${load_dir} \
-  --workers 2 \
-  --partitions 2 \
-  --keep-sequential-samples \
-  --append-eod
 
-elif [ $tokenizer = "llamabpe" ]; then
+if [ $tokenizer = "llamabpe" ]; then
   python preprocess_data_megatron.py \
   --input ${INPUT} \
   --output-prefix ${output_data_dir}/SlimPajama_llamabpe \
