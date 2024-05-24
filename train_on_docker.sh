@@ -1,12 +1,3 @@
-#!/bin/bash
-
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-
-#SBATCH --nodes=4 # number of nodes to use, 2 p4d(e) = 16 A100 GPUs
-#SBATCH --job-name=megatron_gpt # name of your job
-#SBATCH --exclusive # job has exclusive use of the resource, no sharing
-#SBATCH --wait-all-nodes=1
 
 set -ex;
 
@@ -15,8 +6,8 @@ set -ex;
 ###########################
 
 # Parallelism decomposition variables
-: "${TENSOR_PARALLEL:=8}"
-: "${PIPELINE_PARALLEL:=4}"
+: "${TENSOR_PARALLEL:=1}"
+: "${PIPELINE_PARALLEL:=1}"
 
 
 # Model parameters, defaults to 39B model
@@ -29,47 +20,24 @@ set -ex;
 : "${SEQ_LENGTH:=8192}"
 : "${MAX_POSITION_EMBEDDINGS:=8192}"
 : "${MICRO_BATCH_SIZE:=1}"
-: "${GLOBAL_BATCH_SIZE:=128}"
+: "${GLOBAL_BATCH_SIZE:=8}"
 
 : "${EXTRA_VOCAB_SIZE:=256}"
 
-# default variables for Enroot
-: "${IMAGE:=$(pwd)/megatron-llama3-70b-training.sqsh}"
-: "${DATA_PATH:=/fsx}"
-: "${FSX_MOUNT:=$(pwd):$DATA_PATH}"
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+
 
 ###########################
 ## Environment Variables ##
 ###########################
 
-# https://discuss.pytorch.org/t/nccl-network-is-unreachable-connection-refused-when-initializing-ddp/137352
-# https://github.com/pytorch/pytorch/issues/68893
-#export NCCL_SOCKET_IFNAME=ens
-# export NCCL_ASYNC_ERROR_HANDLING=1
-# export NCCL_DEBUG=INFO
-
-# # async runtime error ...
-# export CUDA_DEVICE_MAX_CONNECTIONS=1
-
-# # weights and biases API-KEY
-# export WANDB_API_KEY="334c1fea66a31bc72bbfc9bb2244852031413811"
-
-#########################
-## Command and Options ##
-#########################
-
-declare -a ARGS=(
-    --container-image $IMAGE
-    --container-mounts $FSX_MOUNT
-)
 
 declare -a TORCHRUN_ARGS=(
     # change this to match the number of gpus per node:
     --nproc_per_node=8
-    --nnodes=$SLURM_JOB_NUM_NODES
-    --rdzv_id=$SLURM_JOB_ID
-    --rdzv_backend=c10d
-    --rdzv_endpoint=$(hostname)
+    --nnodes=1
+    --master_addr=localhost
+    --master_port=7000
 )
 
 ##########################
@@ -102,13 +70,13 @@ declare -a MODEL_ARGS=(
         --norm-epsilon 1e-05 
         --position-embedding-type rope
         --rotary-base 500000
-        #--no-rope-fusion 
+        # --no-rope-fusion 
         --use-rotary-position-embeddings
         --swiglu
         --untie-embeddings-and-output-weights
         --group-query-attention
         --num-query-groups 8
-        --no-masked-softmax-fusion
+        # --no-masked-softmax-fusion
 )
 
 declare -a TRAINING_ARGS=(
@@ -130,7 +98,7 @@ declare -a TRAINING_ARGS=(
         --bf16
         --overlap-grad-reduce
         --overlap-param-gather
-        --use-flash-attn
+        #--use-flash-attn
         # --make-vocab-size-divisible-by 64
 )
 
@@ -142,46 +110,24 @@ declare -a MEGATRON_PARALLELISM=(
         --use-distributed-optimizer
 )
 
-declare -a CHECKPOINTING_ARGS=(
-        --save "${DATA_PATH}/hyperpod_checkpoints" 
-        --load "${DATA_PATH}/checkpoint-conversion/Llama3-70B-Checkpoint/Meta-Llama-3-70B-to-mcore-tp8-pp4" 
-        --no-load-optim 
-        --no-save-optim
-        --no-load-rng 
-        --no-save-rng
-        --exit-on-missing-checkpoint
-        --save-interval 7500
-)
-
 declare -a DATA_ARGS=(
-        --data-path "${DATA_PATH}/llama3_data/SlimPajama_llamabpe_text_document" 
-        --hf-tokenizer-path "${DATA_PATH}/****"
+        --data-path "/workspace/Luke-Shamane-processing/tokenized_data/shamane-luke_text_document" 
+        --hf-tokenizer-path "/workspace/Luke-Shamane-processing/tokenizer/base-llama3-70B"
         --tokenizer-type Llama3Tokenizer
         --extra-hf-tokens $EXTRA_VOCAB_SIZE
 
 )
 
 declare -a LOGGING_ARGS=(
-        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B"} 
-        --wandb-exp-name ${WANDB_NAME:-"Llama-70B-Test-1"} 
-        --tensorboard-dir "${DATA_PATH}/hyperpod_checkpoints/tensorboard-cpt" 
         --log-interval 1 
         --log-progress
 )
 
-AUTO_RESUME=""
-if [ -d "/opt/sagemaker_cluster" ]; then
-    echo "Detected Hyperpod cluster.. enabling --auto-resume=1"
-    AUTO_RESUME="--auto-resume=1"
-fi
-
-
 
 # Command to run the training script with distributed settings
-srun    ${AUTO_RESUME} -l "${ARGS[@]}" python -m torch.distributed.run "${TORCHRUN_ARGS[@]}" pretrain_llama3_70b.py \
+torchrun "${TORCHRUN_ARGS[@]}" pretrain_llama3_70b.py \
         "${MEGATRON_PARALLELISM[@]}" \
         "${MODEL_ARGS[@]}" \
         "${TRAINING_ARGS[@]}" \
         "${DATA_ARGS[@]}" \
-        "${CHECKPOINTING_ARGS[@]}" \
         "${LOGGING_ARGS[@]}"
