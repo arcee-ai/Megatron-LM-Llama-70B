@@ -22,7 +22,7 @@ set -ex;
 # Model parameters, defaults to 39B model
 # Refer to page 8 of this paper on how to tune models parameters
 # https://arxiv.org/pdf/2104.04473.pdf
-: "${NUM_LAYERS:=1}"
+: "${NUM_LAYERS:=80}"
 : "${HIDDEN_SIZE:=8192}"
 : "${NUM_ATTENTION_HEADS:=64}"
 
@@ -34,7 +34,7 @@ set -ex;
 : "${EXTRA_VOCAB_SIZE:=256}"
 
 # default variables for Enroot
-: "${IMAGE:=$(pwd)/megatron-llama3-70b-training.sqsh}"
+: "${IMAGE:=$(pwd)/megatron-llama3-70b-latest-training.sqsh}"
 : "${DATA_PATH:=/fsx}"
 : "${FSX_MOUNT:=$(pwd):$DATA_PATH}"
 
@@ -45,14 +45,14 @@ set -ex;
 # https://discuss.pytorch.org/t/nccl-network-is-unreachable-connection-refused-when-initializing-ddp/137352
 # https://github.com/pytorch/pytorch/issues/68893
 #export NCCL_SOCKET_IFNAME=ens
-# export NCCL_ASYNC_ERROR_HANDLING=1
-# export NCCL_DEBUG=INFO
+export NCCL_ASYNC_ERROR_HANDLING=1
+export NCCL_DEBUG=INFO
 
-# # async runtime error ...
-# export CUDA_DEVICE_MAX_CONNECTIONS=1
+# async runtime error ...
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 # # weights and biases API-KEY
-# export WANDB_API_KEY="334c1fea66a31bc72bbfc9bb2244852031413811"
+export WANDB_API_KEY="fab4c867547561879ec227778fd6fdb04fc5420a"
 
 #########################
 ## Command and Options ##
@@ -76,8 +76,8 @@ declare -a TORCHRUN_ARGS=(
 ### Get Train iters
 ##########################
 # Training parameters with default values if not set
-: "${TRAIN_TOKENS:=100000000}"
-: "${WARMUP_TOKENS:=10000}"
+: "${TRAIN_TOKENS:=23284124846}"
+: "${WARMUP_TOKENS:= 232841248}"
 
 # Compute training iterations based on tokens, global batch size, and sequence length
 : "${TRAIN_ITERS:=$(( ${TRAIN_TOKENS} / ${GLOBAL_BATCH_SIZE} / ${SEQ_LENGTH} ))}"
@@ -116,8 +116,8 @@ declare -a TRAINING_ARGS=(
         --global-batch-size $GLOBAL_BATCH_SIZE
         --lr 1.0e-5
         --train-iters $TRAIN_ITERS
-        --eval-iters 40 
-        --eval-interval 10000 
+        --eval-iters 1000 
+        --eval-interval 5000 
         --lr-decay-iters $LR_DECAY_ITERS
         --lr-decay-style cosine
         --lr-warmup-iters $LR_WARMUP_ITERS
@@ -144,27 +144,27 @@ declare -a MEGATRON_PARALLELISM=(
 
 declare -a CHECKPOINTING_ARGS=(
         --save "${DATA_PATH}/hyperpod_checkpoints" 
-        --load "${DATA_PATH}/checkpoint-conversion/Llama3-70B-Checkpoint/Meta-Llama-3-70B-to-mcore-tp8-pp4" 
+        --load "${DATA_PATH}/huggingface-files/mg_converted_TP8_PP4" 
         --no-load-optim 
         --no-save-optim
         --no-load-rng 
         --no-save-rng
         --exit-on-missing-checkpoint
-        --save-interval 7500
+        --save-interval 1000
 )
 
 declare -a DATA_ARGS=(
-        --data-path "${DATA_PATH}/llama3_data/SlimPajama_llamabpe_text_document" 
-        --hf-tokenizer-path "${DATA_PATH}/****"
+        --data-path "${DATA_PATH}/SEC-DATA/sec-tokenized_text_document" 
+        --hf-tokenizer-path "${DATA_PATH}/huggingface-files/tokenizers/llama3_70B_base/snapshots/b4d08b7db49d488da3ac49adf25a6b9ac01ae338"
         --tokenizer-type Llama3Tokenizer
         --extra-hf-tokens $EXTRA_VOCAB_SIZE
 
 )
 
 declare -a LOGGING_ARGS=(
-        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B"} 
-        --wandb-exp-name ${WANDB_NAME:-"Llama-70B-Test-1"} 
-        --tensorboard-dir "${DATA_PATH}/hyperpod_checkpoints/tensorboard-cpt" 
+        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B-TP8-PP4"} 
+        --wandb-exp-name ${WANDB_NAME:-"Llama-70B-Base-Test-TP4-PP8"} 
+        --tensorboard-dir "${DATA_PATH}/hyperpod_checkpoints/tensorboard-cpt-base-TP8-PP4" 
         --log-interval 1 
         --log-progress
 )
