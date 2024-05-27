@@ -1,16 +1,8 @@
-#!/bin/bash
-
-# HARDCODED VARIABLES
-MEGATRON_PATCH_PATH=../..                                                           # SET THE PATH OF THE MEGATRON PATCH CODE
-INPUT_DATA_DIR=/workspace/llama3-70B-checkpoints/raw_data/oscar-1GB.jsonl           # PATH OF THE PACKAGED WUDAO DATASET FOLDER
-TOKENIZER=llamabpe                                                                  # TOKENIZER TYPE
-OUTPUT_DATA_DIR=/workspace/llama3-70B-checkpoints/llama3_data                       # DIRECTORY FOR OUTPUT BIN AND IDX FILES
-HF_TOKENIZER_PATH=/workspace/llama3-70B-checkpoints/Meta-Llama-3-70B-Instruct       # PATH OF THE TOKENIZER_CONFIG.JSON FILE
-
-# RUN THE PRETRAINING DATASET CREATION SCRIPT
-bash run_make_pretraining_dataset_megatron.sh \
-$MEGATRON_PATCH_PATH \
-$INPUT_DATA_DIR \
-$TOKENIZER \
-$OUTPUT_DATA_DIR \
-$HF_TOKENIZER_PATH
+python3 tools/preprocess_data.py \
+        --input /workspace/gpt2/oscar-1GB.jsonl \
+        --output-prefix  /workspace/Luke-Shamane-processing/tokenized_data/shamane-luke \
+        --hf-tokenizer-path /workspace/Luke-Shamane-processing/tokenizer/base-llama3-70B  \
+        --tokenizer-type Llama3Tokenizer \
+        --extra-hf-tokens 256 \
+        --workers 1 \
+        --append-eod
