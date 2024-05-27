@@ -162,7 +162,7 @@ declare -a DATA_ARGS=(
 )
 
 declare -a LOGGING_ARGS=(
-        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B-TP8-PP4"} 
+        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B-TP8-PP4-23-BILLION-TOKENS"} 
         --wandb-exp-name ${WANDB_NAME:-"Llama-70B-Base-Test-TP4-PP8"} 
         --tensorboard-dir "${DATA_PATH}/hyperpod_checkpoints/tensorboard-cpt-base-TP8-PP4" 
         --log-interval 1 
