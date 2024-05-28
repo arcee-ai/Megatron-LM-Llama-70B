@@ -2,12 +2,12 @@
 
 # Arguments
 MODEL_SIZE="70B"                                                                          # Model size: 7B, 13B, 70B
-HG_CKPT_PATH="/workspace/llama3-70B-checkpoints/Meta-Llama-3-70B-Instruct"                # Path to HF checkpoint
-MEGATRON_PATH="../../../"                                                                 # Path to Megatron-LM root directory
-SOURCE_CKPT_PATH="/workspace/llama3-70B-checkpoints/Meta-Llama-3-70B-Instruct"            # Source path
-TARGET_CKPT_PATH="/workspace/llama3-70B-checkpoints/Meta-Llama-3-70B-to-mcore-tp8-pp4"    # Target path
+HG_CKPT_PATH="/workspace/1.megatron-lm-files/huggingface-files/hf_models/llama3_70B_base/models--meta-llama--Meta-Llama-3-70B/snapshots/b4d08b7db49d488da3ac49adf25a6b9ac01ae338"                      # Path to HF checkpoint
+MEGATRON_PATH="./"                                                                       # Path to 1.megatron-lm-files root directory
+SOURCE_CKPT_PATH="/workspace/1.megatron-lm-files/huggingface-files/hf_models/llama3_70B_base/models--meta-llama--Meta-Llama-3-70B/snapshots/b4d08b7db49d488da3ac49adf25a6b9ac01ae338"
+TARGET_CKPT_PATH="/workspace/1.megatron-lm-files/huggingface-files/mg_converted_TP8_PP4"  # Target path
 TP=8                                                                                      # Tensor Parallelism
-PP=4                                                                                      # Pipeline Parallelism
+PP=4                                                                                     # Pipeline Parallelism
 EXTRA_VOCAB_SIZE=256                                                                      # Extra vocabulary size
 NUM_EXPERTS=0                                                                             # Number of experts
 EXPERTS_TOPK=0                                                                            # Topk for expert routing
