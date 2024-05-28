@@ -9,10 +9,6 @@ TARGET_CKPT_PATH="/workspace/1.megatron-lm-files/huggingface-files/mg_converted_
 TP=8                                                                                      # Tensor Parallelism
 PP=4                                                                                     # Pipeline Parallelism
 EXTRA_VOCAB_SIZE=256                                                                      # Extra vocabulary size
-NUM_EXPERTS=0                                                                             # Number of experts
-EXPERTS_TOPK=0                                                                            # Topk for expert routing
-EP=0                                                                                      # Expert parallelism
-NUM_EXPERT_SPLITS=0                                                                          
 mg2hf="false"                                                                             # Whether to execute mcore2hf conversion
 
 # Run the conversion script with provided arguments
