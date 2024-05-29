@@ -21,8 +21,4 @@ bash hf2mcore_convertor.sh \
     $TP \
     $PP \
     $EXTRA_VOCAB_SIZE \
-    $NUM_EXPERTS \
-    $EXPERTS_TOPK \
-    $EP \
-    $NUM_EXPERT_SPLITS \
     $mg2hf
