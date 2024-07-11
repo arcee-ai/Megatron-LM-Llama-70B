@@ -20,22 +20,9 @@ try:
 except ImportError:
     nltk_available = False
 
-from megatron.training.tokenizer import build_tokenizer
 from megatron.core.datasets import indexed_dataset
-
-
-# https://stackoverflow.com/questions/33139531/preserve-empty-lines-with-nltks-punkt-tokenizer
-class CustomLanguageVars(nltk.tokenize.punkt.PunktLanguageVars):
-
-    _period_context_fmt = r"""
-        \S*                          # some word material
-        %(SentEndChars)s             # a potential sentence ending
-        \s*                       #  <-- THIS is what I changed
-        (?=(?P<after_tok>
-            %(NonWord)s              # either other punctuation
-            |
-            (?P<next_tok>\S+)     #  <-- Normally you would have \s+ here
-        ))"""
+# from megatron_patch.tokenizer import build_tokenizer
+from megatron.training.tokenizer import build_tokenizer
 
 class IdentitySplitter(object):
     def tokenize(self, *text):
@@ -60,13 +47,7 @@ class Encoder(object):
                 library = os.path.join("tokenizers", "punkt", f"{self.args.lang}.pickle")
                 url = f"nltk:{library}"
             splitter = nltk.load(url)
-            if self.args.keep_newlines:
-                # this prevents punkt from eating newlines after sentences
-                Encoder.splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
-                    train_text = splitter._params,
-                    lang_vars = CustomLanguageVars())
-            else:
-                Encoder.splitter = splitter
+            Encoder.splitter = splitter
 
         else:
             Encoder.splitter = IdentitySplitter()
@@ -94,7 +75,12 @@ class Encoder(object):
             doc_ids = []
             sentence_lens = []
             for sentence in sentences:
-                sentence_ids = Encoder.tokenizer.tokenize(sentence)
+                #sentence_ids = Encoder.tokenizer.tokenize(sentence)
+                sentence_ids = Encoder.tokenizer(sentence, add_special_tokens=False)['input_ids']
+                if max(sentence_ids) >= Encoder.tokenizer.vocab_size:
+                    print(text)
+                    print(max(sentence_ids))
+                    continue
                 if len(sentence_ids) > 0:
                     doc_ids.extend(sentence_ids)
                     sentence_lens.append(len(sentence_ids))
@@ -142,7 +128,6 @@ class Partition(object):
 
 
     def process_json_file(self, file_name):
-        
         input_file_name, output_prefix = file_name
         print("Opening", input_file_name)
         fin = open(input_file_name, 'r', encoding='utf-8')
@@ -174,25 +159,15 @@ class Partition(object):
         startup_end = time.time()
         proc_start = time.time()
         total_bytes_processed = 0
-        total_tokens_processed = 0
         print("Time to startup:", startup_end - startup_start)
         for i, (doc, sentence_lens, bytes_processed) in enumerate(encoded_docs, start=1):
             total_bytes_processed += bytes_processed
             for key in doc.keys():
                 builders[key].add_document(doc[key], sentence_lens[key])
-                total_tokens_processed += sum(sentence_lens[key])
             self.print_processing_stats(i, proc_start, total_bytes_processed)
 
         fin.close()
         builders[key].finalize(output_idx_files[key])
-        print(f"Total tokens processed: {total_tokens_processed}")
-
-        # Form the full file path
-        full_file_path = os.path.join(os.path.dirname(output_prefix), 'total_tokens.txt')
-
-        # Write total tokens processed to a text file at the specified path
-        with open(full_file_path, 'w') as file:
-            file.write(f"Total tokens processed: {total_tokens_processed}\n")
 
 
 def get_args():
@@ -212,8 +187,7 @@ def get_args():
                        choices=['BertWordPieceLowerCase','BertWordPieceCase',
                                 'GPT2BPETokenizer', 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer', 'Llama2Tokenizer',
-                                'Llama3Tokenizer','NullTokenizer'],
-                                'Llama3Tokenizer', 'MistralTokenizer', 'NullTokenizer'],
+                                'NullTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='YTTM tokenizer model.')
@@ -243,10 +217,28 @@ def get_args():
     group.add_argument('--keep-sequential-samples', action='store_true',
                        help='Ensure ordering of samples in .jsonl files is '
                             'preserved when using partitions>1.')
-    group.add_argument('--hf-tokenizer-path', type=str, required=True,
-                       help='Path to the HF tokenizer')
-    group.add_argument('--extra-hf-tokens', type=int, required=True,
-                       help='How many extra tokens the model has that is not provided by the tokenizer.vocab_size')
+    group.add_argument(
+        '--patch-tokenizer-type',
+        type=str,
+        required=True,
+        choices=['Qwen2Tokenizer', 'LLamaTokenizer','LLama3Tokenizer'],
+        help='What type of tokenizer to use.',
+    )
+    group.add_argument('--hf-tokenizer-path',
+                       type=str,
+                       default=None,
+                       help='path to tokenizer config file')
+
+    group.add_argument('--seq-length',
+                       type=int,
+                       default=4096,
+                       help='sequence length')
+
+    group.add_argument('--extra-vocab-size',
+                       type=int,
+                       default=256,
+                       help='extra_vocab_size')
+
     args = parser.parse_args()
     args.keep_empty = False
 
@@ -290,7 +282,9 @@ def main():
         else:
             raise Exception(
                 "nltk library required for sentence splitting is not available.")
+
     in_ss_out_names = []
+
     if args.partitions == 1:
         file_name, extension = os.path.splitext(args.input)
         sentence_split_file = file_name + "_ss" + extension
@@ -421,4 +415,3 @@ def main():
 if __name__ == '__main__':
 
     main()
-

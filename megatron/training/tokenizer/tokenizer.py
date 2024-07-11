@@ -10,6 +10,9 @@ from typing import Dict, List, Optional
 
 import types
 
+from transformers import AutoTokenizer
+
+
 from megatron.core.datasets.megatron_tokenizer import MegatronTokenizer
 
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
@@ -71,6 +74,13 @@ def build_tokenizer(args):
     elif args.tokenizer_type == 'NullTokenizer':
         assert args.vocab_size is not None
         tokenizer = _NullTokenizer(args.vocab_size)
+    elif args.tokenizer_type == 'Llama3Tokenizer':
+        assert args.hf_tokenizer_path is not None
+        tokenizer = _LLama3Tokenizer(args.hf_tokenizer_path, args.extra_hf_tokens)
+        # In Llama3 tokenizer tokenizer.vocab_size = 128000
+        # But the model config.json says "vocab_size": 128256 (there are actually 256 extra tokens)
+        # So we need to pass new argument called extra_tokens
+        args.padded_vocab_size = tokenizer.vocab_size
     else:
         raise NotImplementedError('{} tokenizer is not '
                                   'implemented.'.format(args.tokenizer_type))
@@ -857,3 +867,44 @@ class _NullTokenizer(MegatronTokenizer):
     @property
     def additional_special_tokens_ids(self):
         return None
+
+class _LLama3Tokenizer(MegatronTokenizer):
+    def __init__(self, tokenizer_path, extra_vocab_size):
+        super().__init__(tokenizer_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_path,
+            padding_side="right",
+            use_fast=False,
+            trust_remote_code=True
+        )
+        self.extra_vocab_size = extra_vocab_size
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size + self.extra_vocab_size
+
+    @property
+    def vocab(self):
+        return self.tokenizer.encoder
+
+    @property
+    def inv_vocab(self):
+        return self.tokenizer.decoder
+
+    def tokenize(self, text):
+        return self.tokenizer.encode(text)
+
+    def detokenize(self, token_ids):
+        return self.tokenizer.decode(token_ids)
+
+    @property
+    def eod(self):
+        return self.tokenizer.eos_token_id
+
+    @property
+    def eos_token(self):
+        return self.tokenizer.eos_token
+
+    @property
+    def pad_token_id(self):
+        return self.tokenizer.pad_token_id
