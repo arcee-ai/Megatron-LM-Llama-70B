@@ -213,6 +213,7 @@ def get_args():
                                 'GPT2BPETokenizer', 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer', 'Llama2Tokenizer',
                                 'Llama3Tokenizer','NullTokenizer'],
+                                'Llama3Tokenizer', 'MistralTokenizer', 'NullTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='YTTM tokenizer model.')

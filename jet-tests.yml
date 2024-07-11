@@ -1,9 +1,15 @@
 .jet_common:
-  stage: jet
+  stage: functional_tests
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /Run tests/'
-    - if: $JET_CUSTOM_FILTER != "" && $CI_PIPELINE_SOURCE != 'merge_request_event'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /Build only/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - when: never
+
+default:
+  id_tokens:
+    VAULT_JWT_TOKEN:
+      aud: https://stg.vault.nvidia.com
 
 include:
   - project: dl/jet/gitlab-templates
@@ -11,71 +17,87 @@ include:
     file: downstreams.yml
 
 jet-setup:
-  extends: [ .jet_common ]
-  tags: 
+  extends: [.jet_common]
+  tags:
     - os/linux
   script:
     - set -x
-    - |
-      if [[ $CI_PIPELINE_SOURCE == "merge_request_event" ]] && [[ $CI_MERGE_REQUEST_LABELS =~ "Run tests" ]]; then
-          JET_FILTER="type == 'build' or 'merge-request' in spec.scope"
-      elif [[ -n $JET_CUSTOM_FILTER && $CI_PIPELINE_SOURCE != 'merge_request_event' ]]; then
-        JET_FILTER=$JET_CUSTOM_FILTER
-      else
-        JET_FILTER="False"
-      fi
-      echo "_JET_FILTER=$JET_FILTER" | tee -a config.env
+    - JET_FILTER=${JET_CUSTOM_FILTER:-False}
+    - echo "_JET_FILTER=$JET_FILTER" | tee -a config.env
   artifacts:
     reports:
       dotenv: config.env
+  interruptible: true
+  retry:
+    max: 2
+    when: job_execution_timeout
 
 jet-configure:
-  image: alpine
+  image: 
+    name: mikefarah/yq:4.35.2
+    entrypoint: [""]
   extends: [.jet_common, .jet-configure]
   tags:
     - os/linux
   script:
-    - wget https://github.com/mikefarah/yq/releases/download/v4.35.2/yq_linux_amd64.tar.gz -O - | tar xz && mv yq_linux_amd64 /usr/local/bin/yq
-    - cd tests/functional_tests/jet_recipes
     - |
-      if [[ $CI_PIPELINE_SOURCE == "merge_request_event" ]]; then
-        yq e ".spec.source.ref = \"merge-requests/${CI_MERGE_REQUEST_IID}/head\"" -i build-pyt.yaml
-      else
-        yq e ".spec.source.ref = \"${CI_COMMIT_REF_NAME}\"" -i build-pyt.yaml
-      fi
+      IMAGE=${CI_MCORE_IMAGE}:${CI_PIPELINE_ID} yq '. |= 
+        (
+          select(.spec.name == "mcore-pyt") 
+          | .spec.source.image = env(IMAGE)
+        )
+      ' -i tests/functional_tests/jet_recipes/build-pyt.yaml
+
+      IMAGE=${CI_NEMO_IMAGE}:${CI_PIPELINE_ID} yq '. |= 
+        (
+          select(.spec.name == "mcore-nemo") 
+          | .spec.source.image = env(IMAGE)
+        )
+      ' -i tests/functional_tests/jet_recipes/build-pyt.yaml
   artifacts:
     paths:
       - tests/functional_tests/jet_recipes
+  interruptible: true
+  retry:
+    max: 2
+    when: job_execution_timeout
 
 jet-trigger:
-  stage: jet
+  stage: functional_tests
   extends: [.jet_common, .jet-trigger]
-  needs:  [ jet-configure, jet-setup ]
+  needs: [metadata, jet-configure, jet-setup]
   trigger:
     project: dl/jet/ci
-    branch: $JET_CLUSTER_BRANCH
+    branch: $JET_CI_BRANCH
     strategy: depend
   inherit:
     variables:
       - JET_CUSTOM_FILTER
-      - JET_CLUSTER_BRANCH
+      - SLURM_CLUSTER
+      - JET_CI_BRANCH
   variables:
-    JET_WORKLOADS_FILTER: "$_JET_FILTER"
-
+    JET_WORKLOADS_FILTER: '$_JET_FILTER'
+    JET_CUSTOM_CONFIG: |
+      launchers:
+        ${SLURM_CLUSTER}:
+          additional_flags:
+            deadline: now+24hours
+  interruptible: true
 
 jet-results-summary:
-  stage: jet
+  stage: functional_tests
   image: gitlab-master.nvidia.com:5005/dl/jet/api:latest
   tags:
     - os/linux
-  needs: [ jet-trigger ]
+  needs: [jet-trigger]
   before_script:
-    - jet secrets jwt-login jwt/nvidia/gitlab-master adlr-megatron-lm-ci $CI_JOB_JWT
-  script: 
+    - jet secrets jwt-login jwt/nvidia/gitlab-master adlr-megatron-lm-ci $VAULT_JWT_TOKEN
+  script:
+    - env
+    - RW_API_TOKEN=${PROJECT_ACCESS_TOKEN} ENDPOINT=${PROJECT_ENDPOINT} bash tests/functional_tests/shell_test_utils/restart_jet_log_jobs.sh ${CI_PIPELINE_ID}
     - python -m pip install -U --no-cache-dir prettytable
     - rc=0
-    - python tests/functional_tests/python_test_utils/jet_test_pipeline.py ${CI_PIPELINE_ID} --test exit --artifact_links $CI_JOB_ID || rc=$?
-    - python tests/functional_tests/python_test_utils/jet_test_pipeline.py ${CI_PIPELINE_ID} --download_scripts_dir ./scripts || rc=$?
+    - python tests/functional_tests/python_test_utils/jet_test_pipeline.py ${CI_PIPELINE_ID} --artifact_links $CI_JOB_ID --download_scripts_dir ./scripts || rc=$?
     - exit $rc
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /Run tests/'
@@ -87,3 +109,5 @@ jet-results-summary:
     when: always
     paths:
       - scripts
+  interruptible: true
+
