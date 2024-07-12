@@ -1559,19 +1559,15 @@ def _add_data_args(parser):
                                 'HuggingFaceTokenizer',
                                 'Llama2Tokenizer',
                                 'NullTokenizer',
-                                'Llama3Tokenizer'],
+                                'Llama3Tokenizer',
+                                'Qwen2Tokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='Sentencepiece tokenizer model.')
     group.add_argument('--extra-hf-tokens', type=int, default=None,
                     help='Some HF tokenizers do not include the extra tokens in tokenizer.vocab_size Eg: llama3.')  
     group.add_argument('--hf-tokenizer-path', type=str, default=None,
-                help='Load non sentencepiece tokenizers from Huggingface Eg: llama3.')  
-                                'Llama3Tokenizer',
-                                'MistralTokenizer',
-                                'TikTokenizer',
-                                'NullTokenizer'],
-                       help='What type of tokenizer to use.')
+                       help='Load non sentencepiece tokenizers from Huggingface Eg: llama3.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='Sentencepiece tokenizer model.')
     group.add_argument('--tiktoken-pattern', type=str, default=None,
