@@ -79,7 +79,14 @@ def build_tokenizer(args):
         tokenizer = _LLama3Tokenizer(args.hf_tokenizer_path, args.extra_hf_tokens)
         # In Llama3 tokenizer tokenizer.vocab_size = 128000
         # But the model config.json says "vocab_size": 128256 (there are actually 256 extra tokens)
-        # So we need to pass new argument called extra_tokens
+        # So we need to pass new argument called extra_hf_tokens
+        args.padded_vocab_size = tokenizer.vocab_size
+    elif args.tokenizer_type == 'Qwen2Tokenizer':
+        assert args.hf_tokenizer_path is not None
+        tokenizer = _Qwen2Tokenizer(args.hf_tokenizer_path, args.extra_hf_tokens)
+        # In Qwen2 tokenizer tokenizer.vocab_size = ....
+        # But the model config.json says "vocab_size": .... (there are actually ... extra tokens)
+        # So we need to pass new argument called extra_hf_tokens
         args.padded_vocab_size = tokenizer.vocab_size
     else:
         raise NotImplementedError('{} tokenizer is not '
@@ -908,3 +915,56 @@ class _LLama3Tokenizer(MegatronTokenizer):
     @property
     def pad_token_id(self):
         return self.tokenizer.pad_token_id
+    
+
+class _Qwen2Tokenizer(MegatronTokenizer):
+    def __init__(self, tokenizer_path, extra_vocab_size):
+        super().__init__(tokenizer_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_path,
+            padding_side="right",
+            use_fast=False,
+            trust_remote_code=True
+        )
+        self.extra_vocab_size = extra_vocab_size
+        self.tokenizer.add_special_tokens(special_tokens_dict=dict(pad_token="<|extra_0|>"))
+
+    def __call__(self, text, return_tensors=None,
+                    padding=None, max_length=None, truncation=None, add_special_tokens=None):
+
+        return self.tokenizer(text, return_tensors=return_tensors, padding=padding,
+                max_length=max_length, truncation=truncation, add_special_tokens=add_special_tokens)
+
+    @property
+    def vocab_size(self):
+        return len(self.tokenizer.encoder) + self.extra_vocab_size
+
+    @property
+    def vocab(self):
+        return self.tokenizer.encoder
+
+    @property
+    def inv_vocab(self):
+        return self.tokenizer.decoder
+
+    def tokenize(self, text):
+        return self.tokenizer.encode(text)
+
+    def detokenize(self, token_ids):
+        return self.tokenizer.decode(token_ids)
+
+    @property
+    def eod(self):
+        return self.tokenizer.eos_token_id
+
+    @property
+    def eos_token(self):
+        return self.tokenizer.eos_token
+
+    @property
+    def pad_token_id(self):
+        return self.tokenizer.pad_token_id
+
+    @property
+    def eos_token_id(self):
+        return self.tokenizer.eos_token_id
