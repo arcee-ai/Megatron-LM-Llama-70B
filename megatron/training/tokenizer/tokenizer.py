@@ -927,7 +927,7 @@ class _Qwen2Tokenizer(MegatronTokenizer):
             trust_remote_code=True
         )
         self.extra_vocab_size = extra_vocab_size
-        self.tokenizer.add_special_tokens(special_tokens_dict=dict(pad_token="<|extra_0|>"))
+        #self.tokenizer.add_special_tokens(special_tokens_dict=dict(pad_token="<|extra_0|>"))
 
     def __call__(self, text, return_tensors=None,
                     padding=None, max_length=None, truncation=None, add_special_tokens=None):
