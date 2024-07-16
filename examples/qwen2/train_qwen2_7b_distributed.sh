@@ -179,7 +179,7 @@ fi
 
 
 # Command to run the training script with distributed settings
-srun    ${AUTO_RESUME} -l "${ARGS[@]}" python -m torch.distributed.run "${TORCHRUN_ARGS[@]}" pretrain_llama3_70b.py \
+srun    ${AUTO_RESUME} -l "${ARGS[@]}" python -m torch.distributed.run "${TORCHRUN_ARGS[@]}" pretrain_gpt.py \
         "${MEGATRON_PARALLELISM[@]}" \
         "${MODEL_ARGS[@]}" \
         "${TRAINING_ARGS[@]}" \
