@@ -786,11 +786,6 @@ def _add_network_size_args(parser):
                           help='Use interleaved rotary embedding.')
     group.add_argument('--rotary-seq-len-interpolation-factor', type=int, default=None,
                        help='Sequence length interpolation factor for rotary embeddings.')
-    # This argument is already there and used in the the GPTModel https://github.com/NVIDIA/Megatron-LM/blob/c3677e09aa4e2eec37048307bd795928b8f8324a/megatron/core/models/gpt/gpt_model.py#L54
-    # But it doesn't get passed and default to 10000
-    # In models like Llama3 the value is 500000
-    group.add_argument('--rotary-base', type=int, default=None,
-                       help='Similar to theta in the Rope')
     group.add_argument('--no-position-embedding',
                        action='store_false',
                        help='Disable position embedding. Deprecated: use --position-embedding-type',
