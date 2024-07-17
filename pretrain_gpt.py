@@ -39,6 +39,7 @@ QWEN2_INSTRUCT_50_SPECTRUM_UNFREEZE_CFG = [
     "embedding",
     "output_layer",
     "layernorm",
+    "layer_norm",
     # MLP
     "decoder.layers.27.mlp.linear_fc2",
     "decoder.layers.5.mlp.linear_fc2",
