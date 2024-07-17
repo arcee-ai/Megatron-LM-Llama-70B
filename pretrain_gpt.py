@@ -35,6 +35,76 @@ from megatron.core.models.gpt.gpt_layer_specs import (
 
 stimer = StragglerDetector()
 
+QWEN2_INSTRUCT_50_SPECTRUM_UNFREEZE_CFG = [
+    "embedding",
+    "output_layer",
+    "layernorm",
+    # MLP
+    "decoder.layers.27.mlp.linear_fc2",
+    "decoder.layers.5.mlp.linear_fc2",
+    "decoder.layers.6.mlp.linear_fc2",
+    "decoder.layers.18.mlp.linear_fc2",
+    "decoder.layers.7.mlp.linear_fc2",
+    "decoder.layers.22.mlp.linear_fc2",
+    "decoder.layers.4.mlp.linear_fc2",
+    "decoder.layers.14.mlp.linear_fc2",
+    "decoder.layers.15.mlp.linear_fc2",
+    "decoder.layers.12.mlp.linear_fc2",
+    "decoder.layers.20.mlp.linear_fc2",
+    "decoder.layers.19.mlp.linear_fc2",
+    "decoder.layers.8.mlp.linear_fc2",
+    "decoder.layers.21.mlp.linear_fc2",
+    # MLP layers (fc1)
+"decoder.layers.18.mlp.linear_fc1",
+"decoder.layers.15.mlp.linear_fc1",
+"decoder.layers.7.mlp.linear_fc1",
+"decoder.layers.8.mlp.linear_fc1",
+"decoder.layers.6.mlp.linear_fc1",
+"decoder.layers.20.mlp.linear_fc1",
+"decoder.layers.12.mlp.linear_fc1",
+"decoder.layers.10.mlp.linear_fc1",
+"decoder.layers.27.mlp.linear_fc1",
+"decoder.layers.17.mlp.linear_fc1",
+"decoder.layers.14.mlp.linear_fc1",
+"decoder.layers.22.mlp.linear_fc1",
+"decoder.layers.16.mlp.linear_fc1",
+"decoder.layers.19.mlp.linear_fc1",
+
+# Self-attention layers (qkv projections)
+"decoder.layers.10.self_attention.linear_qkv",
+"decoder.layers.0.self_attention.linear_qkv",
+"decoder.layers.24.self_attention.linear_qkv",
+"decoder.layers.18.self_attention.linear_qkv",
+"decoder.layers.17.self_attention.linear_qkv",
+"decoder.layers.7.self_attention.linear_qkv",
+"decoder.layers.20.self_attention.linear_qkv",
+"decoder.layers.21.self_attention.linear_qkv",
+"decoder.layers.3.self_attention.linear_qkv",
+"decoder.layers.5.self_attention.linear_qkv",
+"decoder.layers.23.self_attention.linear_qkv",
+"decoder.layers.22.self_attention.linear_qkv",
+"decoder.layers.2.self_attention.linear_qkv",
+"decoder.layers.26.self_attention.linear_qkv",
+    
+# Self-attention output projection
+"decoder.layers.1.self_attention.linear_proj",
+"decoder.layers.8.self_attention.linear_proj",
+"decoder.layers.5.self_attention.linear_proj",
+"decoder.layers.7.self_attention.linear_proj",
+"decoder.layers.4.self_attention.linear_proj",
+"decoder.layers.15.self_attention.linear_proj",
+"decoder.layers.10.self_attention.linear_proj",
+"decoder.layers.2.self_attention.linear_proj",
+"decoder.layers.22.self_attention.linear_proj",
+"decoder.layers.14.self_attention.linear_proj",
+"decoder.layers.11.self_attention.linear_proj",
+"decoder.layers.12.self_attention.linear_proj",
+"decoder.layers.20.self_attention.linear_proj",
+"decoder.layers.18.self_attention.linear_proj",
+
+]
+
+
 def model_provider(pre_process=True, post_process=True) -> Union[GPTModel, megatron.legacy.model.GPTModel]:
     """Builds the model.
 
@@ -90,6 +160,11 @@ def model_provider(pre_process=True, post_process=True) -> Union[GPTModel, megat
             rotary_base=args.rotary_base
         )
 
+    if config.spectrum_freeze:
+        for name, W in model.named_parameters():
+            unfreeze = any(p in name for p in QWEN2_INSTRUCT_50_SPECTRUM_UNFREEZE_CFG)
+            W.requires_grad = unfreeze
+            print(f"spectrum_freeze: param {name} : {W.shape} req grad {W.requires_grad}")
     return model
 
 

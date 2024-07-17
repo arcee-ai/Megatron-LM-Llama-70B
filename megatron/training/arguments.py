@@ -1797,5 +1797,7 @@ def _add_experimental_args(parser):
                        'pattern')
     group.add_argument('--yaml-cfg', type=str, default=None,
                        help = 'Config file to add additional arguments')
+    group.add_argument('--spectrum_freeze', action='store_true',
+                       help='Use hardcoded spectrum configuration to selectively freeze specific modules')
 
     return parser
