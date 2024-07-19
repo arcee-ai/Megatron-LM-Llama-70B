@@ -108,4 +108,3 @@ RUN cd /workspace/Megatron-LM-Llama-70B && \
 
 # Set the working directory to the specific subdirectory for easier command execution
 WORKDIR /workspace/Megatron-LM-Llama-70B
-
