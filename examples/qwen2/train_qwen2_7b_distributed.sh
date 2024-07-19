@@ -24,17 +24,17 @@ set -ex;
 # https://arxiv.org/pdf/2104.04473.pdf
 : "${NUM_LAYERS:=28}"
 : "${HIDDEN_SIZE:=3584}"
-: "${NUM_ATTENTION_HEADS:=12}"
+: "${NUM_ATTENTION_HEADS:=28}"
 
-: "${SEQ_LENGTH:=131072}"
+: "${SEQ_LENGTH:=16384}"
 : "${MAX_POSITION_EMBEDDINGS:=131072}"
-: "${MICRO_BATCH_SIZE:=1}"
+: "${MICRO_BATCH_SIZE:=2}"
 : "${GLOBAL_BATCH_SIZE:=128}"
 
 : "${EXTRA_VOCAB_SIZE:=421}"
 
 # default variables for Enroot
-: "${IMAGE:=$(pwd)/megatron-qwen2-7b-training.sqsh}"
+: "${IMAGE:=$(pwd)/qwen-training.sqsh}"
 : "${DATA_PATH:=/fsx}"
 : "${FSX_MOUNT:=$(pwd):$DATA_PATH}"
 
@@ -44,15 +44,15 @@ set -ex;
 
 # https://discuss.pytorch.org/t/nccl-network-is-unreachable-connection-refused-when-initializing-ddp/137352
 # https://github.com/pytorch/pytorch/issues/68893
-#export NCCL_SOCKET_IFNAME=ens
+# export NCCL_SOCKET_IFNAME=ens
 # export NCCL_ASYNC_ERROR_HANDLING=1
 # export NCCL_DEBUG=INFO
 
-# # async runtime error ...
-# export CUDA_DEVICE_MAX_CONNECTIONS=1
+# async runtime error ...
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 # # weights and biases API-KEY
-# export WANDB_API_KEY="334c1fea66a31bc72bbfc9bb2244852031413811"
+export WANDB_API_KEY="fab4c867547561879ec227778fd6fdb04fc5420a"
 
 #########################
 ## Command and Options ##
@@ -76,8 +76,8 @@ declare -a TORCHRUN_ARGS=(
 ### Get Train iters
 ##########################
 # Training parameters with default values if not set
-: "${TRAIN_TOKENS:=100000000}"
-: "${WARMUP_TOKENS:=10000}"
+: "${TRAIN_TOKENS:=80118284333}"
+: "${WARMUP_TOKENS:=8011828433}"
 
 # Compute training iterations based on tokens, global batch size, and sequence length
 : "${TRAIN_ITERS:=$(( ${TRAIN_TOKENS} / ${GLOBAL_BATCH_SIZE} / ${SEQ_LENGTH} ))}"
@@ -95,21 +95,21 @@ declare -a MODEL_ARGS=(
         --hidden-size $HIDDEN_SIZE
         --ffn-hidden-size 18944
         --num-attention-heads $NUM_ATTENTION_HEADS
-        --init-method-std 0.01
+        --init-method-std 0.008
         --attention-dropout 0.0
         --hidden-dropout 0.0
         --normalization RMSNorm
-        --norm-epsilon 1e-05 
+        --norm-epsilon 1e-06
         --position-embedding-type rope
         --rotary-base 1000000
         --rotary-seq-len-interpolation-factor 1 
-        #--no-rope-fusion 
         --use-rotary-position-embeddings
         --swiglu
         --untie-embeddings-and-output-weights
         --group-query-attention
         --num-query-groups 4
         --no-masked-softmax-fusion
+        --add-qkv-bias
 )
 
 declare -a TRAINING_ARGS=(
@@ -117,8 +117,8 @@ declare -a TRAINING_ARGS=(
         --global-batch-size $GLOBAL_BATCH_SIZE
         --lr 1.0e-5
         --train-iters $TRAIN_ITERS
-        --eval-iters 40 
-        --eval-interval 10000 
+        --eval-iters 25 
+        --eval-interval 1000 
         --lr-decay-iters $LR_DECAY_ITERS
         --lr-decay-style cosine
         --lr-warmup-iters $LR_WARMUP_ITERS
@@ -132,7 +132,7 @@ declare -a TRAINING_ARGS=(
         --overlap-grad-reduce
         --overlap-param-gather
         --use-flash-attn
-        # --make-vocab-size-divisible-by 64
+        --spectrum_freeze
 )
 
 
@@ -145,26 +145,28 @@ declare -a MEGATRON_PARALLELISM=(
 
 declare -a CHECKPOINTING_ARGS=(
         --save "${DATA_PATH}/hyperpod_checkpoints" 
-        --load "${DATA_PATH}/checkpoint-conversion/Llama3-70B-Checkpoint/Meta-Llama-3-70B-to-mcore-tp8-pp4" 
-        --no-load-optim 
+        --load "${DATA_PATH}/hf_checkpoints/qwen2_7b_instruct/megatron_4tp/" 
+        --no-load-optim
         --no-save-optim
-        --no-load-rng 
+        --no-load-rng
         --no-save-rng
         --exit-on-missing-checkpoint
-        --save-interval 7500
+        --save-interval 10000
 )
 
 declare -a DATA_ARGS=(
-        --data-path "${DATA_PATH}/llama3_data/SlimPajama_llamabpe_text_document" 
-        --hf-tokenizer-path "${DATA_PATH}/****"
-        --tokenizer-type Llama3Tokenizer
+        #--data-path "${DATA_PATH}/data/qwen2-instrcut-mg-data/qwen-2-instruct_text_document" 
+        --data-path "${DATA_PATH}/data/qwen2-SEC-data/qwen2-instruct-sec-tokenized_text_document" 
+        #--data-path "${DATA_PATH}/data/qwen-datasets/wudao_qwenbpe_text_document"
+        --hf-tokenizer-path "${DATA_PATH}/data/qwen2-SEC-data/tokenizer"
+        #--hf-tokenizer-path "Qwen/Qwen2-7B-Instruct"
+        --tokenizer-type Qwen2Tokenizer
         --extra-hf-tokens $EXTRA_VOCAB_SIZE
-
 )
 
 declare -a LOGGING_ARGS=(
-        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Llama-70B"} 
-        --wandb-exp-name ${WANDB_NAME:-"Llama-70B-Test-1"} 
+        --wandb-project ${WANDB_PROJECT:-"Hyperpod-Mixtral-Qwen2-7B"}
+        --wandb-exp-name ${WANDB_NAME:-"Qwen2-7B-instruct-sec80B-TE"}
         --tensorboard-dir "${DATA_PATH}/hyperpod_checkpoints/tensorboard-cpt" 
         --log-interval 1 
         --log-progress
